@@ -45,3 +45,27 @@ git status
 '''
 
 
+'''
+以下github给出的基本使用方法：
+1 mkdir gitRepo
+2 cd gitRepo
+3 git init  #初始化本地仓库
+4 git add xxx  #添加要push到远程仓库的文件或文件夹
+5 git commit -m 'first commit'  #提交zhiqadd的文件
+6 git remote add origin https://github.com/yourgithubID/gitRepo.git  #建立远程仓库
+		git remote -v  ###  查看
+		git remote remove origin  ## 移除分支
+7 git push -u origin master #将本地仓库push到远程仓库
+'''
+
+#＃＃ 可能出现的问题  
+# Permission denied (publickey).
+# fatal: Could not read from remote repository.
+# Please make sure you have the correct access rights
+# and the repository exists.
+
+# 出现这个问题是因为，没有在github账号添加SSH key 
+
+# ssh-keygen -t rsa -C "jonnywan"//注意 jonnywan为用户名 
+# cat /User/ranwan/.ssh/id_rsa.pub
+
