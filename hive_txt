@@ -1,0 +1,393 @@
+
+3. 物流行业实例—订单跟踪 SLA
+3.1 创建表
+hadoop dfs -mkdir /tmp/db_case1/order_created
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/t /tmp/db_case1/order_created
+> hive 
+----------------------------
+create database db_case1;
+CREATE EXTERNAL TABLE order_created (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_created';
+----------------------------
+
+3.2 分区表
+hadoop dfs -mkdir /tmp/db_case1/order_created_partition
+hadoop dfs -mkdir /tmp/db_case1/order_created_partition/event_month=2014-05
+hadoop dfs -cp /tmp/db_case1/order_created/t /tmp/db_case1/order_created_partition/event_month=2014-05
+
+> hive
+----------------------------
+CREATE EXTERNAL TABLE order_created_partition(
+    orderNumber STRING
+  , event_time  STRING
+)
+PARTITIONED BY (event_month string)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_created_partition';
+
+msck repair table order_created_partition;
+
+desc order_created_partition;
+desc extended order_created_partition;
+desc formatted order_created_partition;
+desc formatted order_created_partition partition(event_month='2014-05');
+
+----------------------------
+
+3.3 动态分区表
+> hive
+----------------------------
+
+CREATE TABLE order_created_dynamic_partition (
+    orderNumber STRING
+  , event_time  STRING
+)
+PARTITIONED BY (event_month string);
+
+insert into table order_created_dynamic_partition PARTITION (event_month)
+select orderNumber, event_time, substr(event_time, 1, 7) as event_month from order_created;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+/*
+    hive.exec.dynamic.partition=false
+    hive.exec.dynamic.partition.mode=strict
+    hive.exec.max.dynamic.partitions.pernode=100    Maximum number of dynamic partitions allowed to be created in each mapper/reducer node
+    hive.exec.max.dynamic.partitions=1000           Maximum number of dynamic partitions allowed to be created in total
+    hive.exec.max.created.files=100000              Maximum number of HDFS files created by all mappers/reducers in a MapReduce job
+    hive.error.on.empty.partition=false
+*/
+
+-- 虚拟列 INPUT__FILE__NAME  BLOCK__OFFSET__INSIDE__FILE
+select INPUT__FILE__NAME, ordernumber, event_time, BLOCK__OFFSET__INSIDE__FILE / (length(ordernumber) + length(event_time) + 2) + 1 from order_created_dynamic_partition;
+select INPUT__FILE__NAME, ordernumber, event_time, round(BLOCK__OFFSET__INSIDE__FILE / (length(ordernumber) + length(event_time) + 2) + 1) from order_created_dynamic_partition;
+
+----------------------------
+
+--========== order_picked ==========--
+/*
+10703007267488	2014-05-01 07:02:12.334+01
+10101043505096	2014-05-01 08:29:12.342+01
+10103043509747	2014-05-01 10:55:12.33+01
+*/
+CREATE EXTERNAL TABLE order_picked (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_picked';
+
+--========== order_shipped ==========--
+/*
+10703007267488	2014-05-01 10:00:12.334+01
+10101043505096	2014-05-01 18:39:12.342+01
+*/
+CREATE EXTERNAL TABLE order_shipped (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_shipped';
+
+--========== order_received ==========--
+/*
+10703007267488	2014-05-02 12:12:12.334+01
+*/
+CREATE EXTERNAL TABLE order_received (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_received';
+
+--========== order_cancelled ==========--
+/*
+10103043501575	2014-05-01 12:12:12.334+01
+*/
+CREATE EXTERNAL TABLE order_cancelled (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_cancelled';
+
+--=====================================--
+
+CREATE TABLE order_tracking AS
+SELECT orderNumber
+     , max(CASE WHEN type_id="order_created"   THEN event_time ELSE '0' END) AS order_created_ts
+     , max(CASE WHEN type_id="order_picked"    THEN event_time ELSE '0' END) AS order_picked_ts
+     , max(CASE WHEN type_id="order_shipped"   THEN event_time ELSE '0' END) AS order_shipped_ts
+     , max(CASE WHEN type_id="order_received"  THEN event_time ELSE '0' END) AS order_received_ts
+     , max(CASE WHEN type_id="order_cancelled" THEN event_time ELSE '0' END) AS order_cancelled_ts
+FROM (
+    select orderNumber, "order_created"   as type_id, event_time FROM order_created
+  UNION ALL
+    select orderNumber, "order_picked"    as type_id, event_time FROM order_picked
+  UNION ALL
+    select orderNumber, "order_shipped"   as type_id, event_time FROM order_shipped
+  UNION ALL
+    select orderNumber, "order_received"  as type_id, event_time FROM order_received
+  UNION ALL
+    select orderNumber, "order_cancelled" as type_id, event_time FROM order_cancelled
+) u
+group by orderNumber;
+
+select * from order_tracking order by order_created_ts limit 5;
+
+--=====================================--
+
+CREATE TABLE order_tracking_join AS
+select t1.orderNumber
+     , t1.event_time as order_created_ts
+     , t2.event_time as order_picked_ts
+     , t3.event_time as order_shipped_ts
+     , t4.event_time as order_received_ts
+     , t5.event_time as order_cancelled_ts
+from (
+  select ordernumber, max(event_time) as event_time from order_created group by ordernumber
+) t1
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_picked group by ordernumber
+) t2
+on t1.ordernumber = t2.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_shipped group by ordernumber
+) t3
+on t1.ordernumber = t3.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_received group by ordernumber
+) t4
+on t1.ordernumber = t4.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_cancelled group by ordernumber
+) t5
+on t1.ordernumber = t5.ordernumber;
+
+select * from order_tracking_join order by order_created_ts limit 5;
+
+--=====================================--
+
+select orderNumber
+     , order_created_ts
+     , order_picked_ts
+     , order_shipped_ts
+     , order_received_ts
+     , order_cancelled_ts
+  from order_tracking
+ WHERE order_created_ts != '0' AND order_cancelled_ts = '0'
+   AND (
+    COALESCE(unix_timestamp(order_picked_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 2 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 4 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 48 * 60 * 60
+   )
+;
+
+select orderNumber
+     , order_created_ts
+     , order_picked_ts
+     , order_shipped_ts
+     , order_received_ts
+     , order_cancelled_ts
+  from order_tracking_join
+ WHERE order_created_ts IS NOT NULL AND order_cancelled_ts IS NULL
+   AND (
+    COALESCE(unix_timestamp(order_picked_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 2 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 4 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 48 * 60 * 60
+   )
+;
+
+
+
+4. 
+f_orders
+d_items
+d_users
+
+-- case 电商零售行业实例—推荐系统--
+
+--========== f_orders ==========--
+/*
+11  2014-05-01 06:01:12.334+01  10703007267488  item8:2|item1:1
+22  2014-05-01 07:28:12.342+01  10101043505096  item6:3|item3:2
+33  2014-05-01 07:50:12.33+01 10103043509747  item7:7
+11  2014-05-01 09:27:12.33+01 10103043501575  item5:5|item1:1|item4:1|item9:1
+22  2014-05-01 09:03:12.324+01  10104043514061  item1:3
+33  2014-05-02 19:10:12.343+01  11003002067594  item4:2|item1:1
+11  2014-05-02 09:07:12.344+01  10101043497459  item9:1
+35  2014-05-03 11:07:12.339+01  10203019269975  item5:1|item1:1
+789 2014-05-03 12:59:12.743+01  10401003346256  item7:3|item8:2|item9:1
+77  2014-05-03 18:04:12.355+01  10203019262235  item5:2|item1:1
+99  2014-05-04 00:36:39.713+01  10103044681799  item9:3|item1:1
+33  2014-05-04 19:10:12.343+01  12345678901234  item5:1|item1:1
+11  2014-05-05 09:07:12.344+01  12345678901235  item6:1|item1:1
+35  2014-05-05 11:07:12.339+01  12345678901236  item5:2|item1:1
+22  2014-05-05 12:59:12.743+01  12345678901237  item9:3|item1:1
+77  2014-05-05 18:04:12.355+01  12345678901238  item8:3|item1:1
+99  2014-05-05 20:36:39.713+01  12345678901239  item9:3|item1:1
+*/
+CREATE EXTERNAL TABLE f_orders (
+    user_id   STRING
+  , ts        STRING
+  , order_id  STRING
+  , items     map<STRING,BIGINT>
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+COLLECTION ITEMS TERMINATED BY '|'
+MAP KEYS TERMINATED BY ':'
+LOCATION '/tmp/db_case3/f_orders';
+
+select * from f_orders where array_contains(map_keys(items), 'item8');
+
+select user_id, order_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount;
+
+
+--========== d_items ==========--
+/*
+item1 100.2 catalogA|catalogD|catalogX
+item2 200.3 catalogA
+item3 300.4 catalogA|catalogX
+item4 400.5 catalogB
+item5 500.6 catalogB|catalogX
+item6 600.7 catalogB
+item7 700.8 catalogC
+item8 800.9 catalogC|catalogD
+item9 899.99  catalogC|catalogA
+*/
+CREATE EXTERNAL TABLE d_items (
+  item_sku  STRING,
+  price     DOUBLE,
+  catalogs  array<STRING>
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+COLLECTION ITEMS TERMINATED BY '|'
+LOCATION '/tmp/db_case3/d_items';
+
+select orders.user_id, orders.order_id, round(sum(d.price*orders.amount), 2) as order_price
+from (
+  select user_id, order_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount
+) orders
+join d_items d
+on (orders.item = d.item_sku)
+group by orders.user_id, orders.order_id;
+
+
+select orders.user_id, orders.item, orders.amount, catalogs.catalog
+from (
+  select user_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount
+) orders
+join (
+  select item_sku, catalog from d_items LATERAL VIEW explode(catalogs) t AS catalog
+) catalogs
+on (orders.item = catalogs.item_sku)
+;
+
+select user_id, catalog, weight, row_number() OVER (PARTITION BY user_id ORDER BY weight DESC) as row_num FROM usr_cat_weight where user_id < '33';
+select user_id, catalog, weight, rank() OVER (PARTITION BY user_id ORDER BY weight DESC) as rnk FROM usr_cat_weight where user_id < '33';
+select user_id, catalog, weight, dense_rank() OVER (PARTITION BY user_id ORDER BY weight DESC) as drnk FROM usr_cat_weight where user_id < '33';
+
+CREATE TABLE usr_cat AS
+select user_id, catalog, row_number() OVER (PARTITION BY user_id ORDER BY weight DESC) as row_num
+FROM (
+select orders.user_id, catalogs.catalog, sum(orders.amount) as weight
+from (
+  select user_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount
+) orders
+join (
+  select item_sku, catalog from d_items LATERAL VIEW explode(catalogs) t AS catalog
+) catalogs
+on (orders.item = catalogs.item_sku)
+group by orders.user_id, catalogs.catalog
+order by user_id, weight
+) x
+ORDER BY user_id, row_num;
+
+select user_id, group_concat(catalog, '|') from usr_cat where row_num < 3 group by user_id;
+
+--========== d_users ==========--
+/*
+11;m;1981-01-01;user11@gmail.com;2014-04-21
+22;w;1982-01-01;user22@abcn.net;2014-04-22
+33;m;1983-01-01;user33@fxlive.de;2014-04-23
+77;w;1977-01-01;user77@fxlive.fr;2014-05-01
+88;m;1988-01-01;user88@fxlive.eu;2014-05-02
+99;w;1999-01-01;user99@abcn.net;2014-05-03
+789;m;2008-01-01;admin@abcn.net;2014-05-03
+*/
+CREATE EXTERNAL TABLE d_users (
+    user_id  STRING
+  , gender   STRING
+  , birthday STRING
+  , email    STRING
+  , regday   STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\073'
+LOCATION '/tmp/db_case3/d_users';
+
+select user_id, birthday, translate(birthday, '0123456789', '1234567890'), email, translate(email, 'userfxgmail1234567890', '1234567890userfxgmail') from d_users;
+
+CREATE TABLE user_segment AS
+select c.user_id, u.gender, u.age, c.catalogs
+from (
+  select user_id, group_concat(catalog, '|') as catalogs from usr_cat where row_num < 3 group by user_id
+) c
+left outer join (
+  select user_id, gender, year(now()) - cast(substr(birthday, 1, 4) as int) as age from d_users
+) u
+on (c.user_id = u.user_id)
+;
+
+-- 也可以用impala做一些准备工作
+
+CREATE EXTERNAL TABLE f_orders_string (
+    user_id   STRING
+  , ts        STRING
+  , order_id  STRING
+  , items     STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case3/f_orders';
+
+select u.user_id
+     , u.gender
+     , o.orders
+from d_users u
+left outer join (
+  select user_id, group_concat(order_id, '|') as orders
+  from f_orders_string
+  where ts > '2014-05-02'
+  group by user_id
+) o
+on (u.user_id = o.user_id);
+
+select o.user_id
+     , u.gender
+     , o.orders
+from (
+  select user_id, group_concat(order_id, '|') as orders
+  from f_orders_string
+  where ts > '2014-05-02'
+  group by user_id
+) o
+left outer join d_users u
+on (o.user_id = u.user_id);
+
+-- Hive / Impala JDBC 及中文支持问题
+
+beeline -u "jdbc:hive2://itr-hbasetest01:10000/"
+sudo vi /opt/cloudera/parcels/CDH/lib/hive/bin/hive
+
+beeline -u "jdbc:hive2://itr-hbasetest02:21050/;auth=noSasl"
+
+
+

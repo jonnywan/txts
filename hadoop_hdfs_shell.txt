@@ -1,0 +1,379 @@
+Hadoop2 HDFS shell命令
+ 
+1. hdfs dfs -appendToFile <localsrc> ... <dst>
+可同时上传多个文件到HDFS里面
+ 
+2.  hdfs dfs -cat URI [URI ...]
+查看文件内容
+ 
+3. hdfs dfs -chgrp [-R] GROUP URI [URI ...]
+修改文件所属组
+ 
+4.  hdfs dfs -chmod [-R] <MODE[,MODE]... | OCTALMODE> URI [URI ...]
+ 修改文件权限
+ 
+5. hdfs dfs -chown [-R] [OWNER][:[GROUP]] URI [URI ]
+ 修改文件所有者，文件所属组，其他用户的读、写、执行权限
+ 
+6. hdfs dfs -copyFromLocal <localsrc> URI
+复制文件到hdfs
+ 
+7. hdfs dfs -copyToLocal [-ignorecrc] [-crc] URI <localdst>
+复制文件到本地
+ 
+8. hdfs dfs -count [-q] <paths>
+统计文件及文件夹数目
+ 
+9. hdfs dfs -cp [-f] URI [URI ...] <dest>
+Hadoop HDFS 文件系统间的文件复制
+ 
+10. hdfs dfs -du [-s] [-h] URI [URI ...]
+统计目录下的文件及大小
+ 
+11. hdfs dfs -dus <args>
+汇总目录下的文件总大小
+ 
+12. hdfs dfs -expunge
+清空回收站，文件被删除时，它首先会移到临时目录.Trash/中，当超过延迟时间之后，文件才会被永久删除
+ 
+13. hdfs dfs -get [-ignorecrc] [-crc] <src> <localdst>
+下载文件到本地
+ 
+14. hdfs dfs -getfacl [-R] <path>
+查看ACL （访问权限组拥有者）
+ 
+15. hdfs dfs -getmerge <src> <localdst> [addnl]
+合并下载文件到本地
+ 
+16. hdfs dfs -ls <args>
+查看目录
+ 
+17. hdfs dfs -lsr <args>
+循环列出目录、子目录及文件信息 
+ 
+18. hdfs dfs -mkdir [-p] <paths>
+创建空白文件夹
+ 
+19. dfs -moveFromLocal <localsrc> <dst>
+剪切文件到hdfs
+ 
+20. hdfs dfs -moveToLocal [-crc] <src> <dst>
+剪切文件到本地
+ 
+21. hdfs dfs -mv URI [URI ...] <dest>
+剪切hdfs文件
+ 
+22. hdfs dfs -put <localsrc> ... <dst>
+ 
+上传文件
+ 
+23. hdfs dfs -rm [-skipTrash] URI [URI ...]
+ 
+删除文件/空白文件夹
+ 
+24.  hdfs dfs -rmr [-skipTrash] URI [URI ...]
+ 
+递归删除  删除文件及文件夹下的所有文件
+ 
+25. hdfs dfs -setfacl [-R] [-b|-k -m|-x <acl_spec> <path>]|[--set <acl_spec> <path>]
+ 
+Sets Access Control Lists (ACLs) of files and directories.
+Options:
+-b: Remove all but the base ACL entries. The entries for user, group and others are retained for compatibility with permission bits.
+-k: Remove the default ACL.
+-R: Apply operations to all files and directories recursively.
+-m: Modify ACL. New entries are added to the ACL, and existing entries are retained.
+-x: Remove specified ACL entries. Other ACL entries are retained.
+--set: Fully replace the ACL, discarding all existing entries. The acl_spec must include entries for user, group, and others for compatibility with permission bits.
+acl_spec: Comma separated list of ACL entries.
+path: File or directory to modify.
+Examples:
+hdfs dfs -setfacl -m user:hadoop:rw- /file
+hdfs dfs -setfacl -x user:hadoop /file
+hdfs dfs -setfacl -b /file
+hdfs dfs -setfacl -k /dir
+hdfs dfs -setfacl --set user::rw-,user:hadoop:rw-,group::r--,other::r-- /file
+hdfs dfs -setfacl -R -m user:hadoop:r-x /dir
+hdfs dfs -setfacl -m default:user:hadoop:r-x /dir
+Exit Code:
+Returns 0 on success and non-zero on error.
+ 
+ 
+26.  hdfs dfs -setrep [-R] [-w] <numReplicas> <path>
+ 
+修改副本数
+ 
+27. hdfs dfs -stat URI [URI ...]
+ 
+显示文件统计信息
+ 
+28.  hdfs dfs -tail [-f] URI
+ 
+查看文件尾部信息
+ 
+29. hdfs dfs -test -[ezd] URI
+ 
+对PATH进行如下类型的检查： 
+-e PATH是否存在，如果PATH存在，返回0，否则返回1 
+-z 文件是否为空，如果长度为0，返回0，否则返回1 
+-d 是否为目录，如果PATH为目录，返回0，否则返回1 
+ 
+30. hdfs dfs -text <src>
+ 
+查看文件内容
+ 
+31.  hdfs dfs -touchz URI [URI ...]
+ 
+创建长度为0的空文件
+
+
+
+
+
+
+
+
+1. test script for hadoop streaming:
+
+1.1
+hadoop dfs -rmr /out1
+
+1.2
+hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-2.6.0.jar -mapper /home/hadoop/python_script/mapper.py -reducer /home/hadoop/python_script/reducer.py -input /in/file -output /out1 -file *.py
+
+1.3 
+hadoop dfs -text /out1/*
+
+
+2. test hive
+
+2.1 
+hadoop dfs mkdir /hmbbs_logs
+
+2.2
+CREATE EXTERNAL TABLE hmbbs(ip string, atime string, url string) PARTITIONED BY (logdate string) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LOCATION '/hmbbs_logs';
+
+2.3
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/access_2013_05_30.log /hmbbs_logs
+
+
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/access_2015 /hmbbs_logs
+
+
+2.4 
+ALTER TABLE hmbbs ADD PARTITION(logdate='2013_05_30') LOCATION '/hmbbs_logs/2013_05_30.log';
+
+
+ALTER TABLE hmbbs ADD PARTITION(logdate='2013_06_01') LOCATION '/hmbbs_logs/access_2015';
+
+
+
+3.
+3.1 
+hadoop dfs -mkdir /tmp/db_case1/order_created
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/t /tmp/db_case1/order_created
+> hive 
+----------------------------
+create database db_case1;
+CREATE EXTERNAL TABLE order_created (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_created';
+----------------------------
+
+3.2
+
+hadoop dfs -mkdir /tmp/db_case1/order_created_partition
+hadoop dfs -mkdir /tmp/db_case1/order_created_partition/event_month=2014-05
+hadoop dfs -cp /tmp/db_case1/order_created/t /tmp/db_case1/order_created_partition/event_month=2014-05
+
+> hive
+----------------------------
+CREATE EXTERNAL TABLE order_created_partition(
+    orderNumber STRING
+  , event_time  STRING
+)
+PARTITIONED BY (event_month string)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_created_partition';
+
+
+msck repair table order_created_partition;
+
+desc order_created_partition;
+desc extended order_created_partition;
+desc formatted order_created_partition;
+desc formatted order_created_partition partition(event_month='2014-05');
+
+----------------------------
+
+3.3
+> hive
+----------------------------
+
+CREATE TABLE order_created_dynamic_partition (
+    orderNumber STRING
+  , event_time  STRING
+)
+PARTITIONED BY (event_month string);
+
+insert into table order_created_dynamic_partition PARTITION (event_month)
+select orderNumber, event_time, substr(event_time, 1, 7) as event_month from order_created;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+/*
+    hive.exec.dynamic.partition=false
+    hive.exec.dynamic.partition.mode=strict
+    hive.exec.max.dynamic.partitions.pernode=100    Maximum number of dynamic partitions allowed to be created in each mapper/reducer node
+    hive.exec.max.dynamic.partitions=1000           Maximum number of dynamic partitions allowed to be created in total
+    hive.exec.max.created.files=100000              Maximum number of HDFS files created by all mappers/reducers in a MapReduce job
+    hive.error.on.empty.partition=false
+*/
+
+-- 虚拟列 INPUT__FILE__NAME  BLOCK__OFFSET__INSIDE__FILE
+select INPUT__FILE__NAME, ordernumber, event_time, BLOCK__OFFSET__INSIDE__FILE / (length(ordernumber) + length(event_time) + 2) + 1 from order_created_dynamic_partition;
+select INPUT__FILE__NAME, ordernumber, event_time, round(BLOCK__OFFSET__INSIDE__FILE / (length(ordernumber) + length(event_time) + 2) + 1) from order_created_dynamic_partition;
+
+----------------------------
+
+--========== order_picked ==========--
+/*
+10703007267488	2014-05-01 07:02:12.334+01
+10101043505096	2014-05-01 08:29:12.342+01
+10103043509747	2014-05-01 10:55:12.33+01
+*/
+CREATE EXTERNAL TABLE order_picked (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_picked';
+
+--========== order_shipped ==========--
+/*
+10703007267488	2014-05-01 10:00:12.334+01
+10101043505096	2014-05-01 18:39:12.342+01
+*/
+CREATE EXTERNAL TABLE order_shipped (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_shipped';
+
+--========== order_received ==========--
+/*
+10703007267488	2014-05-02 12:12:12.334+01
+*/
+CREATE EXTERNAL TABLE order_received (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_received';
+
+--========== order_cancelled ==========--
+/*
+10103043501575	2014-05-01 12:12:12.334+01
+*/
+CREATE EXTERNAL TABLE order_cancelled (
+    orderNumber STRING
+  , event_time  STRING
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/tmp/db_case1/order_cancelled';
+
+--=====================================--
+
+CREATE TABLE order_tracking AS
+SELECT orderNumber
+     , max(CASE WHEN type_id="order_created"   THEN event_time ELSE '0' END) AS order_created_ts
+     , max(CASE WHEN type_id="order_picked"    THEN event_time ELSE '0' END) AS order_picked_ts
+     , max(CASE WHEN type_id="order_shipped"   THEN event_time ELSE '0' END) AS order_shipped_ts
+     , max(CASE WHEN type_id="order_received"  THEN event_time ELSE '0' END) AS order_received_ts
+     , max(CASE WHEN type_id="order_cancelled" THEN event_time ELSE '0' END) AS order_cancelled_ts
+FROM (
+    select orderNumber, "order_created"   as type_id, event_time FROM order_created
+  UNION ALL
+    select orderNumber, "order_picked"    as type_id, event_time FROM order_picked
+  UNION ALL
+    select orderNumber, "order_shipped"   as type_id, event_time FROM order_shipped
+  UNION ALL
+    select orderNumber, "order_received"  as type_id, event_time FROM order_received
+  UNION ALL
+    select orderNumber, "order_cancelled" as type_id, event_time FROM order_cancelled
+) u
+group by orderNumber;
+
+select * from order_tracking order by order_created_ts limit 5;
+
+--=====================================--
+
+CREATE TABLE order_tracking_join AS
+select t1.orderNumber
+     , t1.event_time as order_created_ts
+     , t2.event_time as order_picked_ts
+     , t3.event_time as order_shipped_ts
+     , t4.event_time as order_received_ts
+     , t5.event_time as order_cancelled_ts
+from (
+  select ordernumber, max(event_time) as event_time from order_created group by ordernumber
+) t1
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_picked group by ordernumber
+) t2
+on t1.ordernumber = t2.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_shipped group by ordernumber
+) t3
+on t1.ordernumber = t3.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_received group by ordernumber
+) t4
+on t1.ordernumber = t4.ordernumber
+left outer join (
+  select ordernumber, max(event_time) as event_time from order_cancelled group by ordernumber
+) t5
+on t1.ordernumber = t5.ordernumber;
+
+select * from order_tracking_join order by order_created_ts limit 5;
+
+--=====================================--
+
+select orderNumber
+     , order_created_ts
+     , order_picked_ts
+     , order_shipped_ts
+     , order_received_ts
+     , order_cancelled_ts
+  from order_tracking
+ WHERE order_created_ts != '0' AND order_cancelled_ts = '0'
+   AND (
+    COALESCE(unix_timestamp(order_picked_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 2 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 4 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 48 * 60 * 60
+   )
+;
+
+select orderNumber
+     , order_created_ts
+     , order_picked_ts
+     , order_shipped_ts
+     , order_received_ts
+     , order_cancelled_ts
+  from order_tracking_join
+ WHERE order_created_ts IS NOT NULL AND order_cancelled_ts IS NULL
+   AND (
+    COALESCE(unix_timestamp(order_picked_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 2 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 4 * 60 * 60
+    OR
+    COALESCE(unix_timestamp(order_shipped_ts, 'yyyy-MM-dd HH:mm:ss.S'), 0) - unix_timestamp(order_created_ts, 'yyyy-MM-dd HH:mm:ss.S') > 48 * 60 * 60
+   )
+;
+
+
