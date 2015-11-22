@@ -148,7 +148,6 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 
-
 // 
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
@@ -161,6 +160,9 @@ val schema1 =
   StructField("gender", StringType, false) ::
  StructField("address", StringType, false) ::Nil)
 
+// 添加  file://， 以读取本地文件路径  "/home/hadoop/tmp/customers.txt" 为单机本地路径
+// val textFile = sc.textFile("file:///home/hadoop/soft/spark-1.4.0-bin-hadoop2.6/README.md")
+
 val customer = sc.textFile("/home/hadoop/tmp/customers.txt").map(_.split('|')).map(r=>Row(r(0),r(1).trim.toInt,r(2),r(3))) 
 val dataFrame1 = sqlContext.createDataFrame(customer, schema1)
 dataFrame1.printSchema
@@ -168,7 +170,6 @@ dataFrame1.printSchema
 dataFrame1.registerTempTable("customer")
 sqlContext.sql("select name from customer").collect.foreach(println)
 sqlContext.sql("select * from customer where gender='M' and age < 30").collect().foreach(println)
-
 
 
 // registerTempTable
@@ -191,5 +192,85 @@ dataFrame.printSchema
 
 dataFrame.registerTempTable("people")
 sqlContext.sql("select name from people").collect.foreach(println)
+
+
+// 从hdfs读取数据  /in/customers.txt 是hdfs上面的数据
+val customer = sc.textFile("/in/customers.txt").map(_.split('|')).map(r=>Row(r(0),r(1).trim.toInt,r(2),r(3))) 
+val dataFrame1 = sqlContext.createDataFrame(customer, schema1)
+dataFrame1.printSchema
+
+dataFrame1.registerTempTable("customer")
+sqlContext.sql("select name from customer").collect.foreach(println)
+sqlContext.sql("select * from customer where gender='M' and age < 30").collect().foreach(println)
+
+// 五 Apache Spark上跑Logistic Regression算法
+// 数据集可以从UCI机器学习库https://archive.ics.uci.edu/ml/datasets/qualitative_bankruptcy下载。
+// 在Spark的安装文件夹中，创建一个新的文件夹命名为playground。复制 qualitative_bankruptcy.data.txt文件到这里面。
+
+// 1、导入所需要的库
+import org.apache.spark.mllib.classification.{LogisticRegressionWithLBFGS, LogisticRegressionModel}
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
+
+// 2.接下来我们将创建一个Scala函数，将数据集中的qualitative数据转换为Double型数值。
+def getDoubleValue( input:String ) : Double = {
+    var result:Double = 0.0
+    if (input == "P")  result = 3.0 
+    if (input == "A")  result = 2.0
+    if (input == "N")  result = 1.0
+    if (input == "NB") result = 1.0
+    if (input == "B")  result = 0.0
+    return result
+   }
+
+// 3、我们可以读取到qualitative_bankruptcy.data.txt文件中的数据。
+// 从Spark的角度来看，这是一个Transformation操作。在这个阶段，数据实际上不被读入内存。
+// 如前所述，这是一个lazy的方式执行。实际的读取操作是由count()引发，这是一个Action操作。
+val data = sc.textFile("playground/Qualitative_Bankruptcy.data.txt")
+data.count()
+
+// 4、为逻辑回归算法准备数据，将字符串转换为数值型。
+val parsedData = data.map{line =
+    val parts = line.split(",")
+    LabeledPoint(getDoubleValue(parts(6)), Vectors.dense(parts.slice(0,6).map(x =getDoubleValue(x))))
+}
+
+// 使用“，”拆分字符串，并获得一个向量，命名为parts
+// 创建并返回一个LabeledPoint对象。每个LabeledPoint包含标签和值的向量。
+// 在我们的训练数据，标签或类别（破产或非破产）放在最后一列，数组下标0到6。
+// 这是我们使用的parts(6)。在保存标签之前，我们将用getDoubleValue()函数将字符串转换为Double型。
+// 其余的值也被转换为Double型数值，并保存在一个名为稠密矢量的数据结构。
+// 这也是Spark的逻辑回归算法所需要的数据结构。
+// Spark支持map()转换操作，Action动作执行时，第一个执行的就是map()
+
+parsedData.take(10)
+
+// 5、接着我们划分一下训练数据和测试数据，将parsedData的60%分为训练数据，40%分为测试数据。
+val splits = parsedData.randomSplit(Array(0.6, 0.4), seed = 11L)
+val trainingData = splits(0)
+val testData = splits(1)
+
+// 训练数据和测试数据也可以像上面一样，使用take()者count()查看。
+
+// 6、我们现在开始使用Spark的LogisticRegressioinWithLBFGS()来训练模型。设置好分类个数，这里是2个（破产和非破产）	
+val model = new LogisticRegressionWithLBFGS().setNumClasses(2).run(trainingData)
+
+// 7、当模型训练完，我们可以使用testData来检验一下模型的出错率。
+val labelAndPreds = testData.map { point =
+  val prediction = model.predict(point.features)
+  (point.label, prediction)
+}
+val trainErr = labelAndPreds.filter(r = r._1 != r._2).count.toDouble / testData.count
+
+// 变量labelAndPreds保存了map()转换操作，map()将每一个行转换成二元组。
+// 二元组包含了testData的标签数据(point.label，分类数据)和预测出来的分类数据(prediction)。
+// 模型使用point.features作为输入数据。
+// 最后一行代码，我们使用filter()转换操作和count()动作操作来计算模型出错率。
+// filter()中，保留预测分类和所属分类不一致的元组。在Scala中_1和_2可以用来访问元组的第一个元素和第二个元素。
+// 最后用预测出错的数量除以testData训练集的数量，我们可以得到模型出错率。
+
+
+// 六、spark运行hdfsWordCount例子
+./bin/run-example org.apache.spark.examples.streaming.HdfsWordCount hfds://hadoop1:9000/in/sherlock_homles7.txt
 
 
