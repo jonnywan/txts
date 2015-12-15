@@ -1,2 +1,66 @@
 1. mac path
 	more ~/.bash_profile
+
+2. mac homebrew
+	2.1 install
+		ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+	2.2 usage
+		搜索软件：brew search 软件名，如brew search wget
+		安装软件：brew install 软件名，如brew install wget
+		卸载软件：brew remove 软件名，如brew remove wget
+		more : http://brew.sh/index_zh-cn.html
+
+
+3. mac pyenv virtualenv
+	3.1 
+		brew install pyenv
+		brew install pyenv-virtualenv
+
+	3.2
+		pyenv -v
+		pyenv-virtualenv --version
+
+	3.3 pyenv install --list 查看可以安装的python版本
+
+	3.4 pyenv install 3.4.3
+
+	3.5 pyenv versions
+
+	3.6 vi .bash_profile
+		added:
+			if which pyenv > /dev/null; then eval "$(pyenv init -)"; fi
+			if which pyenv-virtualenv-init > /dev/null; then eval "$(pyenv virtualenv-init -)"; fi
+
+	3.7 pyenv global 来回切换python版本
+		python
+		pyenv versions
+		pyenv global system
+		pyenv versions
+
+	3.8 pyenv virtualenv创建虚拟python环境
+		pyenv virtualenv 3.4.3 myvenv
+		pyenv virtualenvs
+		pyenv versions
+		pyenv shell myvenv
+		python
+
+	3.9 pyenv 的相关命令通过pyenv -h 和 pyenv commands来查看，具体用法自己试验。
+	
+4. mac pip
+	Pip and setuptools have been installed. To update them
+  	pip3 install --upgrade pip setuptools
+
+	You can install Python packages with
+	pip3 install <package>
+
+	They will install into the site-package directory
+	/usr/local/lib/python3.5/site-packages	
+
+5. pyvenv 
+	5.1 create new env
+		Users/ranwan # pyvenv  env_name (env_py3)
+	5.2 activate env
+		Users/ranwan # source env_py3/bin/activate
+	5.3 deactivate to exit
+		Users/ranwan # deactivate
+
