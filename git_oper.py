@@ -69,3 +69,34 @@ git status
 # ssh-keygen -t rsa -C "jonnywan"//注意 jonnywan为用户名 
 # cat /User/ranwan/.ssh/id_rsa.pub
 
+
+# Third
+# 删除工作去文件，并且将这次删除放入暂存区
+git rm [file1] [file2] ...
+
+# 改名文件，并且将这个改名放入暂存区
+git mv [file-original] [file-renamed]
+
+# Fouth
+# 列出所有本地分支
+git branch
+
+# 列出所有远程分支
+git branch -r
+
+# 列出所有本地分支和远程分支
+git branch -a
+
+# 新建一个分支，但依然停留在当前分支
+git branch [branch name]
+
+# 新建一个分支，并切换到该分支
+git checkout -b [branch]
+
+
+
+
+
+
+
+

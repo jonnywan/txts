@@ -13,6 +13,8 @@
 4. 访问 master:4040  看到spark WEBUI页面
 
 二、环境测试
+
 1. 读取hdfs数据，统计数量
-val readmefile = sc.textFile("hdfs://hadoop1:9000/in/sherlock_homles7.txt")
-readmefile.count()
+scala> val readmefile = sc.textFile("hdfs://hadoop1:9000/in/sherlock_homles7.txt")
+scala> readmefile.count()
+scala> exit
