@@ -67,6 +67,9 @@ select INPUT__FILE__NAME, ordernumber, event_time, round(BLOCK__OFFSET__INSIDE__
 
 ----------------------------
 
+hadoop dfs -mkdir /tmp/db_case1/order_picked
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/order_picked /tmp/db_case1/order_picked/
+
 --========== order_picked ==========--
 /*
 10703007267488	2014-05-01 07:02:12.334+01
@@ -79,6 +82,7 @@ CREATE EXTERNAL TABLE order_picked (
 )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
 LOCATION '/tmp/db_case1/order_picked';
+
 
 --========== order_shipped ==========--
 /*
@@ -207,24 +211,27 @@ select orderNumber
 
 
 
-4. 
+# 4.  
 f_orders
 d_items
 d_users
 
 -- case 电商零售行业实例—推荐系统--
 
+hadoop dfs -mkdir /tmp/db_case3/f_orders
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/f_orders /tmp/db_case3/f_orders
+
 --========== f_orders ==========--
 /*
 11  2014-05-01 06:01:12.334+01  10703007267488  item8:2|item1:1
 22  2014-05-01 07:28:12.342+01  10101043505096  item6:3|item3:2
-33  2014-05-01 07:50:12.33+01 10103043509747  item7:7
-11  2014-05-01 09:27:12.33+01 10103043501575  item5:5|item1:1|item4:1|item9:1
+33  2014-05-01 07:50:12.33+01  10103043509747  item7:7
+11  2014-05-01 09:27:12.33+01  10103043501575  item5:5|item1:1|item4:1|item9:1
 22  2014-05-01 09:03:12.324+01  10104043514061  item1:3
 33  2014-05-02 19:10:12.343+01  11003002067594  item4:2|item1:1
 11  2014-05-02 09:07:12.344+01  10101043497459  item9:1
 35  2014-05-03 11:07:12.339+01  10203019269975  item5:1|item1:1
-789 2014-05-03 12:59:12.743+01  10401003346256  item7:3|item8:2|item9:1
+78  2014-05-03 12:59:12.743+01  10401003346256  item7:3|item8:2|item9:1
 77  2014-05-03 18:04:12.355+01  10203019262235  item5:2|item1:1
 99  2014-05-04 00:36:39.713+01  10103044681799  item9:3|item1:1
 33  2014-05-04 19:10:12.343+01  12345678901234  item5:1|item1:1
@@ -251,6 +258,9 @@ select * from f_orders where array_contains(map_keys(items), 'item8');
 select user_id, order_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount;
 
 
+hadoop dfs -mkdir /tmp/db_case3/d_items
+hadoop dfs -copyFromLocal /home/hadoop/Downloads/d_items /tmp/db_case3/d_items
+
 --========== d_items ==========--
 /*
 item1 100.2 catalogA|catalogD|catalogX
@@ -273,6 +283,8 @@ FIELDS TERMINATED BY '\t'
 COLLECTION ITEMS TERMINATED BY '|'
 LOCATION '/tmp/db_case3/d_items';
 
+-- 1. 查询订单内每个sku及对应个数；
+-- 2. 计算每个订单的总金额
 select orders.user_id, orders.order_id, round(sum(d.price*orders.amount), 2) as order_price
 from (
   select user_id, order_id, item, amount from f_orders LATERAL VIEW explode(items) t AS item, amount
@@ -281,6 +293,7 @@ join d_items d
 on (orders.item = d.item_sku)
 group by orders.user_id, orders.order_id;
 
+-- 1. 订单中每个sku的分类列表 一个订单多个sku，一个sku多个分类
 
 select orders.user_id, orders.item, orders.amount, catalogs.catalog
 from (
@@ -294,7 +307,8 @@ on (orders.item = catalogs.item_sku)
 
 select user_id, catalog, weight, row_number() OVER (PARTITION BY user_id ORDER BY weight DESC) as row_num FROM usr_cat_weight where user_id < '33';
 select user_id, catalog, weight, rank() OVER (PARTITION BY user_id ORDER BY weight DESC) as rnk FROM usr_cat_weight where user_id < '33';
-select user_id, catalog, weight, dense_rank() OVER (PARTITION BY user_id ORDER BY weight DESC) as drnk FROM usr_cat_weight where user_id < '33';
+select user_id, catalog, weight, dense_rank() OVER (PARTITION BY user_id ORDER BY weight DESC) as drnk FROM usr_cat_weight where user_id < '33'ii;
+
 
 CREATE TABLE usr_cat AS
 select user_id, catalog, row_number() OVER (PARTITION BY user_id ORDER BY weight DESC) as row_num
@@ -346,6 +360,8 @@ left outer join (
 ) u
 on (c.user_id = u.user_id)
 ;
+
+
 
 -- 也可以用impala做一些准备工作
 

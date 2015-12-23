@@ -29,7 +29,7 @@ sbin/stop-dfs.sh
 
 
 
-1. test script for hadoop streaming:
+# 1. test script for hadoop streaming:
 
 1.1
 hadoop dfs -rmr /out1
@@ -40,8 +40,8 @@ hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-2.6.0.jar
 1.3 
 hadoop dfs -text /out1/*
 
-
-2. test hive
+------------
+# 2. test hive
 
 2.1 
 hadoop dfs mkdir /hmbbs_logs
@@ -52,14 +52,12 @@ CREATE EXTERNAL TABLE hmbbs(ip string, atime string, url string) PARTITIONED BY 
 2.3
 hadoop dfs -copyFromLocal /home/hadoop/Downloads/access_2013_05_30.log /hmbbs_logs
 
-
 hadoop dfs -copyFromLocal /home/hadoop/Downloads/access_2015 /hmbbs_logs
 
 
 2.4 
 ALTER TABLE hmbbs ADD PARTITION(logdate='2013_05_30') LOCATION '/hmbbs_logs/2013_05_30.log';
-
-
 ALTER TABLE hmbbs ADD PARTITION(logdate='2013_06_01') LOCATION '/hmbbs_logs/access_2015';
 
+2.5 
 

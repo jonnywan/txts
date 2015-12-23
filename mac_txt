@@ -10,7 +10,6 @@
 		卸载软件：brew remove 软件名，如brew remove wget
 		more : http://brew.sh/index_zh-cn.html
 
-
 3. mac pyenv virtualenv
 	3.1 
 		brew install pyenv
@@ -64,4 +63,7 @@
 	5.3 deactivate to exit
 		Users/ranwan # deactivate
 
-67
+6. linux 文件管理
+	du -sh /directory
+	df -h
+7
